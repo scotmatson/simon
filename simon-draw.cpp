@@ -59,6 +59,12 @@ typedef struct Coord {
 void init(void);
 void display(void);
 void draw(void);
+void trace(void);
+coord_t* draw_point(coord_t*);
+coord_t* draw_line(coord_t*);
+coord_t* draw_rectangle(coord_t*);
+coord_t* draw_ellipse(coord_t*);
+coord_t* draw_bezier_curve(coord_t*);
 void main_menu(int);
 void object_menu(int);
 void fill_menu(int);
@@ -80,13 +86,14 @@ const GLfloat FAR_CLIPPING_PLANE  = 100.0f;
 
 // Mouse stuff
 GLint mouse_left_active;
+GLboolean tracing = false;
 
 // (x,y) coordinates for drawing
-GLfloat x_px = 0.0f;
-GLfloat y_px = 0.0f;
+GLfloat x_px;
+GLfloat y_px;
 const GLfloat z_px = -1.0f;
-GLfloat dx_px = 0.0f;
-GLfloat dy_px = 0.0f;
+GLfloat dx_px;
+GLfloat dy_px;
 
 // Setting  defaults
 GLenum draw_mode       = GL_POINTS;
@@ -133,6 +140,7 @@ void push(coord_t *new_coord) {
   }
 }
 
+
 /*
  *  Scene intialization
  */
@@ -151,46 +159,74 @@ void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glLoadIdentity();
 
-  glPushMatrix();
-  glBegin(GL_POINTS);
-    glPolygonMode(GL_FRONT, GL_POINT);
-    glColor3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(x_px, y_px, z_px);
-  glEnd();
-  glPopMatrix();
+  if (tracing) {
+    trace();
+  }
 
   draw();
-
   glutSwapBuffers();
+}
+
+void trace() {
+  glPushMatrix();
+  glBegin(GL_LINES);
+    glColor3f(selected_red, selected_green, selected_blue);
+    glVertex3f(x_px, y_px, z_px);
+    glVertex3f(dx_px, dy_px, z_px);
+  glEnd();
+  glPopMatrix();
 }
 
 /*
  *  Draws to the canvas
  */
 void draw() {
-
   coord_t *current = head;
-
   while (current != NULL) {
-    glBegin(current->draw_mode);
-      glPolygonMode(GL_FRONT, current->fill_mode);
-      glColor3f(current->r, current->g, current->b);
-//      do {
-        glVertex3f(current->x, current->y, current->z);
-        /*
-        current = current->next;
-      } while (
-          current != NULL &&
-          current->draw_mode == current->next->draw_mode &&
-          current->fill_mode == current->next->fill_mode &&
-          current->r == current->next->r &&
-          current->g == current->next->g &&
-          current->b == current->next->b);
-          */
-    glEnd();
-    current = current->next;
+    if (current->draw_mode == GL_POINTS) { current = draw_point(current); }
+    else if (current->draw_mode == GL_LINES) { current = draw_line(current); }
   }
 }
+
+/*
+ *  Draws points
+ */
+coord_t* draw_point(coord_t *current) {
+  glPushMatrix();
+  glPolygonMode(GL_FRONT, current->fill_mode);
+  glColor3f(current->r, current->g, current->b);
+  glBegin(current->draw_mode);
+    glVertex3f(current->x, current->y, current->z);
+  glEnd();
+  glPopMatrix();
+  return current->next;
+}
+
+coord_t* draw_line(coord_t *current) {
+  glPolygonMode(GL_FRONT, current->fill_mode);
+  glColor3f(current->r, current->g, current->b);
+
+  glBegin(current->draw_mode);
+    glVertex3f(current->x, current->y, current->z);
+    current = current->next;
+    glVertex3f(current->x, current->y, current->z);
+  glEnd();
+  return current->next;
+}
+
+/*
+coord_t* draw_rectangle() {
+
+}
+
+coord_t* draw_ellipse() {
+
+}
+
+coord_t* draw_bezier_curve() {
+
+}
+*/
 
 /*
  *  Create a menu system
@@ -253,33 +289,33 @@ void color_menu(int value) {
   switch(value) {
     case RED:
       selected_red   = 1.0f;
-      selected_green = 0;
-      selected_blue  = 0;
+      selected_green = 0.0f;
+      selected_blue  = 0.0f;
       break;
     case GREEN:
-      selected_red   = 0;
+      selected_red   = 0.0f;
       selected_green = 1.0f;
-      selected_blue  = 0;
+      selected_blue  = 0.0f;
       break;
     case BLUE:
-      selected_red   = 0;
-      selected_green = 0;
+      selected_red   = 0.0f;
+      selected_green = 0.0f;
       selected_blue  = 1.0f;
       break;
     case YELLOW:
-      selected_red   = 0;
+      selected_red   = 1.0f;
       selected_green = 1.0f;
-      selected_blue  = 1.0f;
+      selected_blue  = 0.0f;
       break;
     case PURPLE:
-      selected_red   = 1.0f;
-      selected_green = 0;
+      selected_red   = 0.5f;
+      selected_green = 0.0f;
       selected_blue  = 1.0f;
       break;
     case ORANGE:
       selected_red   = 1.0f;
-      selected_green = 1.0f;
-      selected_blue  = 0;
+      selected_green = 0.5f;
+      selected_blue  = 0.0f;
       break;
     case WHITE:
       selected_red   = 1.0f;
@@ -304,13 +340,10 @@ void reshape(int w, int h) {
   glViewport(0, 0, w, h);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  /*
-  gluPerspective(FIELD_OF_VIEW,
-                 (float)w / (float) h,
-                 NEAR_CLIPPING_PLANE,
-                 FAR_CLIPPING_PLANE);
-  */
-  glOrtho(-1.0, 1.0, -1.0, 1.0, NEAR_CLIPPING_PLANE, FAR_CLIPPING_PLANE);
+  glOrtho(
+    -1.0, 1.0, -1.0, 1.0, 
+    NEAR_CLIPPING_PLANE, 
+    FAR_CLIPPING_PLANE);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 }
@@ -334,21 +367,50 @@ void keyboard(unsigned char key, int x, int y) {
  */
 void mouse(int button, int state, int x, int y) {
   if (state == GLUT_DOWN) {
+
     switch(button) {
       case GLUT_LEFT_BUTTON:
         // Captures the (x, y) coordinate on mousedown
         mouse_left_active = true;
-        //GLfloat viewport[4];
-        //glGetFloatv(GL_VIEWPORT, viewport);
-        //x_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
-        //y_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
+        GLfloat viewport[4];
+        glGetFloatv(GL_VIEWPORT, viewport);
+        x_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
+        y_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
         break;
       default:
         break;
     }
   }
   if (state == GLUT_UP) {
+    // Set pivot
+    GLfloat viewport[4];
+    glGetFloatv(GL_VIEWPORT, viewport);
+    dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
+    dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
+    tracing = false;
     mouse_left_active = false;
+    if (draw_mode == GL_LINES) {
+      coord_t *point = (coord_t*) malloc(sizeof(coord_t));
+      point->draw_mode = draw_mode;
+      point->fill_mode = polygon_mode;
+      point->x = x_px;
+      point->y = y_px;
+      point->z = z_px;
+      point->r = selected_red;
+      point->g = selected_green;
+      point->b = selected_blue;
+      push(point);
+
+      point->draw_mode = draw_mode;
+      point->fill_mode = polygon_mode;
+      point->x = dx_px;
+      point->y = dy_px;
+      point->z = z_px;
+      point->r = selected_red;
+      point->g = selected_green;
+      point->b = selected_blue;
+      push(point);
+    }
   }
   glutPostRedisplay();
 }
@@ -372,6 +434,13 @@ void motion(int x, int y) {
         point->g = selected_green;
         point->b = selected_blue;
         push(point);
+    }
+    if (draw_mode == GL_LINES) {
+      tracing = true;
+      GLfloat viewport[4];
+      glGetFloatv(GL_VIEWPORT, viewport);
+      dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
+      dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
     }
   }
   glutPostRedisplay();
