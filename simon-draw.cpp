@@ -168,13 +168,28 @@ void display() {
 }
 
 void trace() {
-  glPushMatrix();
-  glBegin(GL_LINES);
+  if (draw_mode == GL_LINES) {
+    glPushMatrix();
+    glBegin(GL_LINES);
+      glColor3f(selected_red, selected_green, selected_blue);
+      glVertex3f(x_px, y_px, z_px);
+      glVertex3f(dx_px, dy_px, z_px);
+    glEnd();
+    glPopMatrix();
+  }
+  else
+  if (draw_mode == GL_QUADS) {
+    glPushMatrix();
     glColor3f(selected_red, selected_green, selected_blue);
-    glVertex3f(x_px, y_px, z_px);
-    glVertex3f(dx_px, dy_px, z_px);
-  glEnd();
-  glPopMatrix();
+    glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+    glBegin(GL_QUADS);
+        glVertex3f(x_px, y_px, z_px);    // Top left
+        glVertex3f(dx_px, y_px, z_px);   // Top right
+        glVertex3f(dx_px, dy_px, z_px);  // Bottom right
+        glVertex3f(x_px, dy_px, z_px);   // Bottom left
+    glEnd();
+    glPopMatrix();
+  }
 }
 
 /*
@@ -183,8 +198,9 @@ void trace() {
 void draw() {
   coord_t *current = head;
   while (current != NULL) {
-    if (current->draw_mode == GL_POINTS) { current = draw_point(current); }
-    else if (current->draw_mode == GL_LINES) { current = draw_line(current); }
+    if (current->draw_mode == GL_POINTS) {current = draw_point(current);}
+    else if (current->draw_mode == GL_LINES) {current = draw_line(current);}
+    else if (current->draw_mode == GL_QUADS) {current = draw_rectangle(current);}
   }
 }
 
@@ -193,7 +209,7 @@ void draw() {
  */
 coord_t* draw_point(coord_t *current) {
   glPushMatrix();
-  glPolygonMode(GL_FRONT, current->fill_mode);
+  glPolygonMode(GL_FRONT_AND_BACK, current->fill_mode);
   glColor3f(current->r, current->g, current->b);
   glBegin(current->draw_mode);
     glVertex3f(current->x, current->y, current->z);
@@ -203,7 +219,8 @@ coord_t* draw_point(coord_t *current) {
 }
 
 coord_t* draw_line(coord_t *current) {
-  glPolygonMode(GL_FRONT, current->fill_mode);
+  glPushMatrix();
+  glPolygonMode(GL_FRONT_AND_BACK, current->fill_mode);
   glColor3f(current->r, current->g, current->b);
 
   glBegin(current->draw_mode);
@@ -211,14 +228,30 @@ coord_t* draw_line(coord_t *current) {
     current = current->next;
     glVertex3f(current->x, current->y, current->z);
   glEnd();
+  glPopMatrix();
   return current->next;
 }
 
-/*
-coord_t* draw_rectangle() {
+coord_t* draw_rectangle(coord_t *current) {
+  glPushMatrix();
+  glPolygonMode(GL_FRONT_AND_BACK, current->fill_mode);
+  glColor3f(current->r, current->g, current->b);
+
+  glBegin(current->draw_mode);
+    glVertex3f(current->x, current->y, current->z);
+    current = current->next;
+    glVertex3f(current->x, current->y, current->z);
+    current = current->next;
+    glVertex3f(current->x, current->y, current->z);
+    current = current->next;
+    glVertex3f(current->x, current->y, current->z);
+  glEnd();
+  glPopMatrix();
+  return current->next;
 
 }
 
+/*
 coord_t* draw_ellipse() {
 
 }
@@ -411,6 +444,53 @@ void mouse(int button, int state, int x, int y) {
       point->b = selected_blue;
       push(point);
     }
+    else
+    if (draw_mode == GL_QUADS) {
+      coord_t *point = (coord_t*) malloc(sizeof(coord_t));
+      // Top Left
+      point->draw_mode = draw_mode;
+      point->fill_mode = polygon_mode;
+      point->x = x_px;
+      point->y = y_px;
+      point->z = z_px;
+      point->r = selected_red;
+      point->g = selected_green;
+      point->b = selected_blue;
+      push(point);
+
+      // Top Right
+      point->draw_mode = draw_mode;
+      point->fill_mode = polygon_mode;
+      point->x = dx_px;
+      point->y = y_px;
+      point->z = z_px;
+      point->r = selected_red;
+      point->g = selected_green;
+      point->b = selected_blue;
+      push(point);
+
+      // Bottom Right
+      point->draw_mode = draw_mode;
+      point->fill_mode = polygon_mode;
+      point->x = dx_px;
+      point->y = dy_px;
+      point->z = z_px;
+      point->r = selected_red;
+      point->g = selected_green;
+      point->b = selected_blue;
+      push(point);
+
+      // Bottom Left
+      point->draw_mode = draw_mode;
+      point->fill_mode = polygon_mode;
+      point->x = x_px;
+      point->y = dy_px;
+      point->z = z_px;
+      point->r = selected_red;
+      point->g = selected_green;
+      point->b = selected_blue;
+      push(point);
+    }
   }
   glutPostRedisplay();
 }
@@ -435,6 +515,7 @@ void motion(int x, int y) {
         point->b = selected_blue;
         push(point);
     }
+    else
     if (draw_mode == GL_LINES) {
       tracing = true;
       GLfloat viewport[4];
@@ -442,6 +523,16 @@ void motion(int x, int y) {
       dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
       dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
     }
+    else
+    if (draw_mode == GL_QUADS) {
+      tracing = true;
+      GLfloat viewport[4];
+      glGetFloatv(GL_VIEWPORT, viewport);
+      dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
+      dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
+    }
+    // LINE_LOOP == hollow circle
+    // TRIANGLE_FAN == filled circle
   }
   glutPostRedisplay();
 }
