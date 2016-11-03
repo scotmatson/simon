@@ -97,7 +97,7 @@ GLfloat dy_px;
 
 // Setting  defaults
 GLenum draw_mode       = GL_POINTS;
-GLenum polygon_mode    = GL_POINT;
+GLenum polygon_mode    = GL_LINE;
 GLfloat selected_red   = 0.0f;
 GLfloat selected_green = 0.0f;
 GLfloat selected_blue  = 0.0f;
@@ -277,20 +277,24 @@ void object_menu(int value){
   switch(value) {
     case POINT:
       draw_mode = GL_POINTS;
-      polygon_mode = GL_POINT;
       break;
     case LINE:
       draw_mode = GL_LINES;
-      polygon_mode = GL_LINE;
       break;
     case RECTANGLE:
       draw_mode = GL_QUADS;
       break;
     case ELLIPSE:
-      draw_mode = ELLIPSE;
+      if (polygon_mode == GL_FILL) {
+        draw_mode = GL_TRIANGLE_FAN;
+      }
+      else
+      if (polygon_mode == GL_LINE) {
+        draw_mode = GL_LINE_LOOP;
+      }
       break;
     case BEZIER_CURVE:
-      draw_mode = BEZIER_CURVE;
+      //draw_mode = BEZIER_CURVE;
       break;
     default:
       break;
@@ -531,8 +535,14 @@ void motion(int x, int y) {
       dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
       dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
     }
-    // LINE_LOOP == hollow circle
-    // TRIANGLE_FAN == filled circle
+    else
+    if (draw_mode == GL_LINE_LOOP) {
+
+    }
+    else
+    if (draw_mode == GL_TRIANGLE_FAN) {
+
+    }
   }
   glutPostRedisplay();
 }
