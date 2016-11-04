@@ -6,7 +6,7 @@
     Scot Matson
 
   Programming Project 4:
-    A 2D Paint and Draw Program
+    A 2D digital drawing application
 
   macOS Build:
     g++ -Wno-depcreated-declarations -framework OpenGL -frameworks GLUT [file.ext]
@@ -15,6 +15,7 @@
 #include <GLUT/glut.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 // Display values
 #define X_RESOLUTION 1280
@@ -162,7 +163,6 @@ void display() {
   if (tracing) {
     trace();
   }
-
   draw();
   glutSwapBuffers();
 }
@@ -170,7 +170,7 @@ void display() {
 void trace() {
   if (draw_mode == GL_LINES) {
     glPushMatrix();
-    glBegin(GL_LINES);
+    glBegin(draw_mode);
       glColor3f(selected_red, selected_green, selected_blue);
       glVertex3f(x_px, y_px, z_px);
       glVertex3f(dx_px, dy_px, z_px);
@@ -182,11 +182,33 @@ void trace() {
     glPushMatrix();
     glColor3f(selected_red, selected_green, selected_blue);
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
-    glBegin(GL_QUADS);
+    glBegin(draw_mode);
         glVertex3f(x_px, y_px, z_px);    // Top left
         glVertex3f(dx_px, y_px, z_px);   // Top right
         glVertex3f(dx_px, dy_px, z_px);  // Bottom right
         glVertex3f(x_px, dy_px, z_px);   // Bottom left
+    glEnd();
+    glPopMatrix();
+  }
+  else
+  if (draw_mode == GL_LINE_LOOP || draw_mode == GL_TRIANGLE_FAN) {
+    GLint number_of_segments = 100;
+    glPushMatrix();
+    glColor3f(selected_red, selected_green, selected_blue);
+    //glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glBegin(draw_mode);
+      for (int i = 0; i < number_of_segments; i++) {
+        float theta = 2.0f * M_PI * float(i)/ number_of_segments;
+
+        GLfloat rx = dx_px - x_px;
+        GLfloat ry = dy_px - y_px;
+
+        float circle_x = rx * cosf(theta);
+        float circle_y = ry * sinf(theta);
+
+        glVertex3f(circle_x + x_px, circle_y + y_px, z_px);
+      }
     glEnd();
     glPopMatrix();
   }
@@ -201,6 +223,9 @@ void draw() {
     if (current->draw_mode == GL_POINTS) {current = draw_point(current);}
     else if (current->draw_mode == GL_LINES) {current = draw_line(current);}
     else if (current->draw_mode == GL_QUADS) {current = draw_rectangle(current);}
+    else if (current->draw_mode == GL_LINE_LOOP || current->draw_mode == GL_TRIANGLE_FAN) {
+        current = draw_ellipse(current);
+    }
   }
 }
 
@@ -248,18 +273,41 @@ coord_t* draw_rectangle(coord_t *current) {
   glEnd();
   glPopMatrix();
   return current->next;
-
 }
 
-/*
-coord_t* draw_ellipse() {
+coord_t* draw_ellipse(coord_t *current) {
 
+    GLfloat origin_x = current->x;
+    GLfloat origin_y = current->y;
+
+    current = current->next;
+
+    GLfloat arc_x = current->x;
+    GLfloat arc_y = current->y;
+
+    GLint number_of_segments = 100;
+    glPolygonMode(GL_FRONT_AND_BACK, current->fill_mode);
+    glColor3f(current->r, current->g, current->b);
+
+    glPushMatrix();
+    glBegin(current->draw_mode);
+      for (int i = 0; i < number_of_segments; i++) {
+        float theta = 2.0f * M_PI * float(i) / number_of_segments;
+
+        GLfloat rx = arc_x - origin_x;
+        GLfloat ry = arc_y - origin_y;
+
+        float cx = rx * cosf(theta);
+        float cy = ry * sinf(theta);
+
+        glVertex3f(cx + origin_x, cy + origin_y, z_px);
+      }
+    glEnd();
+    glPopMatrix();
+  return current->next;
 }
 
-coord_t* draw_bezier_curve() {
-
-}
-*/
+//coord_t* draw_bezier_curve() {}
 
 /*
  *  Create a menu system
@@ -285,13 +333,9 @@ void object_menu(int value){
       draw_mode = GL_QUADS;
       break;
     case ELLIPSE:
-      if (polygon_mode == GL_FILL) {
-        draw_mode = GL_TRIANGLE_FAN;
-      }
+      if (polygon_mode == GL_FILL) {draw_mode = GL_TRIANGLE_FAN;}
       else
-      if (polygon_mode == GL_LINE) {
-        draw_mode = GL_LINE_LOOP;
-      }
+      if (polygon_mode == GL_LINE) {draw_mode = GL_LINE_LOOP;}
       break;
     case BEZIER_CURVE:
       //draw_mode = BEZIER_CURVE;
@@ -309,9 +353,11 @@ void fill_menu(int value){
   switch(value) {
     case FILLED:
       polygon_mode = GL_FILL;
+      if (draw_mode == GL_LINE_LOOP) {draw_mode = GL_TRIANGLE_FAN;}
       break;
     case OUTLINE:
       polygon_mode = GL_LINE;
+      if (draw_mode == GL_TRIANGLE_FAN) {draw_mode = GL_LINE_LOOP;}
       break;
     default:
       break;
@@ -419,15 +465,10 @@ void mouse(int button, int state, int x, int y) {
     }
   }
   if (state == GLUT_UP) {
-    // Set pivot
-    GLfloat viewport[4];
-    glGetFloatv(GL_VIEWPORT, viewport);
-    dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
-    dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
     tracing = false;
     mouse_left_active = false;
-    if (draw_mode == GL_LINES) {
-      coord_t *point = (coord_t*) malloc(sizeof(coord_t));
+    coord_t *point = (coord_t*) malloc(sizeof(coord_t));
+    if (draw_mode == GL_LINES || draw_mode == GL_LINE_LOOP || draw_mode == GL_TRIANGLE_FAN) {
       point->draw_mode = draw_mode;
       point->fill_mode = polygon_mode;
       point->x = x_px;
@@ -450,7 +491,6 @@ void mouse(int button, int state, int x, int y) {
     }
     else
     if (draw_mode == GL_QUADS) {
-      coord_t *point = (coord_t*) malloc(sizeof(coord_t));
       // Top Left
       point->draw_mode = draw_mode;
       point->fill_mode = polygon_mode;
@@ -495,6 +535,7 @@ void mouse(int button, int state, int x, int y) {
       point->b = selected_blue;
       push(point);
     }
+    free(point);
   }
   glutPostRedisplay();
 }
@@ -519,29 +560,12 @@ void motion(int x, int y) {
         point->b = selected_blue;
         push(point);
     }
-    else
-    if (draw_mode == GL_LINES) {
+    else {
       tracing = true;
       GLfloat viewport[4];
       glGetFloatv(GL_VIEWPORT, viewport);
       dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
       dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
-    }
-    else
-    if (draw_mode == GL_QUADS) {
-      tracing = true;
-      GLfloat viewport[4];
-      glGetFloatv(GL_VIEWPORT, viewport);
-      dx_px =  ((float)x / (viewport[2] / 2.0f)) - 1.0f;
-      dy_px = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
-    }
-    else
-    if (draw_mode == GL_LINE_LOOP) {
-
-    }
-    else
-    if (draw_mode == GL_TRIANGLE_FAN) {
-
     }
   }
   glutPostRedisplay();
