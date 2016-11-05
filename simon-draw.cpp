@@ -27,6 +27,7 @@
 // Glut Menu Options
 #define ALL 0
 #define NO_POLYGON 1
+
 // Object menu
 #define POINT        0
 #define LINE         1
@@ -51,6 +52,7 @@
 typedef struct Coord {
   GLenum  draw_mode;
   GLenum  polygon_mode;
+  GLfloat line_weight;
   GLint   control_points;
   GLfloat x;
   GLfloat y;
@@ -68,6 +70,7 @@ void object_menu(int);
 void polygon_menu(int);
 void color_menu(int);
 void background_color_menu(int);
+void line_weight_menu(int);
 void display(void);
 void reshape(int, int);
 void keyboard(unsigned char, int, int);
@@ -103,8 +106,13 @@ int menu;
 int fills;
 int colors;
 int background_colors;
+int line_weights;
 int objects;
 int menu_mode;
+
+// Menu toggles
+int menuHasFills;
+
 
 // (x,y) coordinates for drawing
 GLfloat x_px;
@@ -125,6 +133,7 @@ GLint number_of_control_points = 0;
 // Setting  defaults
 GLenum draw_mode       = GL_POINTS;
 GLenum polygon_mode    = GL_LINE;
+GLfloat line_weight    = 1.0f;
 GLfloat selected_red   = 0.0f;
 GLfloat selected_green = 0.0f;
 GLfloat selected_blue  = 0.0f;
@@ -139,6 +148,7 @@ void push(coord_t *new_coord) {
     head = (coord_t*) malloc(sizeof(coord_t));
     head->draw_mode = new_coord->draw_mode;
     head->polygon_mode = new_coord->polygon_mode;
+    head->line_weight = new_coord->line_weight;
     head->control_points = new_coord->control_points;
     head->x = new_coord->x;
     head->y = new_coord->y;
@@ -158,6 +168,7 @@ void push(coord_t *new_coord) {
     current->next = (coord_t*) malloc(sizeof(coord_t));
     current->next->draw_mode = new_coord->draw_mode;
     current->next->polygon_mode = new_coord->polygon_mode; 
+    current->next->line_weight = new_coord->line_weight; 
     current->next->control_points = new_coord->control_points; 
     current->next->x = new_coord->x;
     current->next->y = new_coord->y;
@@ -216,6 +227,7 @@ void trace() {
 void trace_line() {
   glColor3f(selected_red, selected_green, selected_blue);
   glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+  glLineWidth(line_weight);
   glPushMatrix();
   glBegin(draw_mode);
     glVertex3f(x_px, y_px, z_px);
@@ -230,6 +242,7 @@ void trace_line() {
 void trace_rectangle() {
   glColor3f(selected_red, selected_green, selected_blue);
   glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+  glLineWidth(line_weight);
   glPushMatrix();
   glBegin(draw_mode);
     glVertex3f(x_px, y_px, z_px);    // Top left
@@ -247,6 +260,7 @@ void trace_ellipse() {
   GLint number_of_segments = 100;
   glColor3f(selected_red, selected_green, selected_blue);
   glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+  glLineWidth(line_weight);
   glPushMatrix();
   glBegin(draw_mode);
     for (int i = 0; i < number_of_segments; i++) {
@@ -270,6 +284,7 @@ void trace_ellipse() {
 void trace_bezier_curve() {
   glColor3f(selected_red, selected_green, selected_blue);
   glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+  glLineWidth(line_weight);
   GLfloat x_bc, y_bc;
   glPushMatrix();
   glBegin(draw_mode);
@@ -339,8 +354,10 @@ void draw() {
  *  Draws a point
  */
 coord_t* draw_point(coord_t *current) {
-  glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
   glColor3f(current->r, current->g, current->b);
+  glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
+  glLineWidth(current->line_weight);
+  
   glPushMatrix();
   glBegin(current->draw_mode);
     glVertex3f(current->x, current->y, current->z);
@@ -353,10 +370,11 @@ coord_t* draw_point(coord_t *current) {
  * Draws a line
  */
 coord_t* draw_line(coord_t *current) {
-  glPushMatrix();
-  glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
   glColor3f(current->r, current->g, current->b);
+  glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
+  glLineWidth(current->line_weight);
 
+  glPushMatrix();
   glBegin(current->draw_mode);
     glVertex3f(current->x, current->y, current->z);
     current = current->next;
@@ -370,10 +388,11 @@ coord_t* draw_line(coord_t *current) {
  *  Draws a rectangle
  */
 coord_t* draw_rectangle(coord_t *current) {
-  glPushMatrix();
-  glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
   glColor3f(current->r, current->g, current->b);
+  glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
+  glLineWidth(current->line_weight);
 
+  glPushMatrix();
   glBegin(current->draw_mode);
     glVertex3f(current->x, current->y, current->z);
     current = current->next;
@@ -401,8 +420,9 @@ coord_t* draw_ellipse(coord_t *current) {
     GLfloat arc_y = current->y;
 
     GLint number_of_segments = 100;
-    glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
     glColor3f(current->r, current->g, current->b);
+    glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
+    glLineWidth(current->line_weight);
 
     glPushMatrix();
     glBegin(current->draw_mode);
@@ -471,6 +491,8 @@ coord_t* draw_bezier_curve(coord_t *current) {
   GLfloat x_bc, y_bc;
   glColor3f(current->r, current->g, current->b);
   glPolygonMode(GL_FRONT_AND_BACK, current->polygon_mode);
+  glLineWidth(current->line_weight);
+
   glPushMatrix();
   glBegin(current->draw_mode);
     for (float t = 0; t < 1; t += 0.01) {
@@ -541,14 +563,28 @@ void menu_init() {
   glutAddMenuEntry("White", WHITE);
   glutAddMenuEntry("Black", BLACK);
 
+  line_weights = glutCreateMenu(line_weight_menu);
+  glutAddMenuEntry("1", 1);
+  glutAddMenuEntry("2", 2);
+  glutAddMenuEntry("3", 3);
+  glutAddMenuEntry("4", 4);
+  glutAddMenuEntry("5", 5);
+  glutAddMenuEntry("6", 6);
+  glutAddMenuEntry("7", 7);
+  glutAddMenuEntry("8", 8);
+  glutAddMenuEntry("9", 9);
+  glutAddMenuEntry("10", 10);
+
   fills = glutCreateMenu(polygon_menu);
   glutAddMenuEntry("Filled", FILLED);
   glutAddMenuEntry("Outline", OUTLINE);
+  menuHasFills = false;
 
   menu = glutCreateMenu(main_menu);
   glutAddSubMenu("Objects", objects);
   glutAddSubMenu("Colors", colors);
   glutAddSubMenu("Background Colors", background_colors);
+  glutAddSubMenu("Line Weights", line_weights);
   glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 
@@ -559,9 +595,9 @@ void main_menu(int value) {
   glutSetMenu(menu);
   switch(value) {
     case ALL:
-      if (menu_mode != 0) {
-        glutRemoveMenuItem(fills);
+      if (menu_mode != 0 && !menuHasFills) {
         glutAddSubMenu("Fills", fills);
+        menuHasFills = true;
         menu_mode = 0;
       }
       break;
@@ -716,6 +752,45 @@ void background_color_menu(int value) {
   glutPostRedisplay();
 }
 
+void line_weight_menu(int value) {
+  switch(value) {
+    case 1:
+      line_weight = 1.0f;
+      break;
+    case 2:
+      line_weight = 2.0f;
+      break;
+    case 3:
+      line_weight = 3.0f;
+      break;
+    case 4:
+      line_weight = 4.0f;
+      break;
+    case 5:
+      line_weight = 5.0f;
+      break;
+    case 6:
+      line_weight = 6.0f;
+      break;
+    case 7:
+      line_weight = 7.0f;
+      break;
+    case 8:
+      line_weight = 8.0f;
+      break;
+    case 9:
+      line_weight = 9.0f;
+      break;
+    case 10:
+      line_weight = 10.0f;
+      break;
+    default:
+      break;
+  }
+
+  glutPostRedisplay();
+}
+
 
 /*
  *  Reshapes the display window
@@ -795,6 +870,7 @@ void mouse(int button, int state, int x, int y) {
       coord_t *point = (coord_t*) malloc(sizeof(coord_t));
       point->draw_mode = draw_mode;
       point->polygon_mode = polygon_mode;
+      point->line_weight = line_weight;
       point->x = x_px;
       point->y = y_px;
       point->z = z_px;
@@ -805,6 +881,7 @@ void mouse(int button, int state, int x, int y) {
 
       point->draw_mode = draw_mode;
       point->polygon_mode = polygon_mode;
+      point->line_weight = line_weight;
       point->x = dx_px;
       point->y = dy_px;
       point->z = z_px;
@@ -821,6 +898,7 @@ void mouse(int button, int state, int x, int y) {
       // Top Left
       point->draw_mode = draw_mode;
       point->polygon_mode = polygon_mode;
+      point->line_weight = line_weight;
       point->x = x_px;
       point->y = y_px;
       point->z = z_px;
@@ -832,6 +910,7 @@ void mouse(int button, int state, int x, int y) {
       // Top Right
       point->draw_mode = draw_mode;
       point->polygon_mode = polygon_mode;
+      point->line_weight = line_weight;
       point->x = dx_px;
       point->y = y_px;
       point->z = z_px;
@@ -843,6 +922,7 @@ void mouse(int button, int state, int x, int y) {
       // Bottom Right
       point->draw_mode = draw_mode;
       point->polygon_mode = polygon_mode;
+      point->line_weight = line_weight;
       point->x = dx_px;
       point->y = dy_px;
       point->z = z_px;
@@ -854,6 +934,7 @@ void mouse(int button, int state, int x, int y) {
       // Bottom Left
       point->draw_mode = draw_mode;
       point->polygon_mode = polygon_mode;
+      point->line_weight = line_weight;
       point->x = x_px;
       point->y = dy_px;
       point->z = z_px;
@@ -877,6 +958,7 @@ void mouse(int button, int state, int x, int y) {
             coord_t *point = (coord_t*) malloc(sizeof(coord_t));
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points-1;
             point->x = x_cp0;
             point->y = y_cp0;
@@ -888,6 +970,7 @@ void mouse(int button, int state, int x, int y) {
 
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points-1;
             point->x = x_cp1;
             point->y = y_cp1;
@@ -910,6 +993,7 @@ void mouse(int button, int state, int x, int y) {
             coord_t *point = (coord_t*) malloc(sizeof(coord_t));
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points-1;
             point->x = x_cp0;
             point->y = y_cp0;
@@ -921,6 +1005,7 @@ void mouse(int button, int state, int x, int y) {
 
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points-1;
             point->x = x_cp1;
             point->y = y_cp1;
@@ -932,6 +1017,7 @@ void mouse(int button, int state, int x, int y) {
 
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points-1;
             point->x = x_cp2;
             point->y = y_cp2;
@@ -950,6 +1036,7 @@ void mouse(int button, int state, int x, int y) {
             coord_t *point = (coord_t*) malloc(sizeof(coord_t));
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points;
             point->x = x_cp0;
             point->y = y_cp0;
@@ -961,6 +1048,7 @@ void mouse(int button, int state, int x, int y) {
 
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points;
             point->x = x_cp1;
             point->y = y_cp1;
@@ -972,6 +1060,7 @@ void mouse(int button, int state, int x, int y) {
 
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points;
             point->x = x_cp2;
             point->y = y_cp2;
@@ -983,6 +1072,7 @@ void mouse(int button, int state, int x, int y) {
 
             point->draw_mode = draw_mode;
             point->polygon_mode = polygon_mode;
+            point->line_weight = line_weight;
             point->control_points = number_of_control_points;
             point->x = x_cp3;
             point->y = y_cp3;
@@ -1017,6 +1107,7 @@ void motion(int x, int y) {
         coord_t *point = (coord_t*) malloc(sizeof(coord_t));
         point->draw_mode = draw_mode;
         point->polygon_mode = polygon_mode;
+        point->line_weight = line_weight;
         point->x = ((float)x / (viewport[2] / 2.0f)) - 1.0f;
         point->y = -((float)y / (viewport[3] / 2.0f)) + 1.0f;
         point->z = z_px;
