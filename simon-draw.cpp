@@ -604,6 +604,7 @@ void main_menu(int value) {
     case NO_POLYGON:
       if (menu_mode != 1) {
         glutRemoveMenuItem(fills);
+        menuHasFills = false;
         menu_mode = 1;
       }
     default:
